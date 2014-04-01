@@ -18,9 +18,47 @@
 #include "devices.h"
 #include "board-8930.h"
 
+
+#if 1
+static struct gpiomux_setting volume_key_actv_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+static struct gpiomux_setting volume_key_susp_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_OUT_LOW,
+};
+static struct gpiomux_setting camera_key_actv_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+static struct gpiomux_setting camera_key_susp_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+#endif
+
+static struct gpiomux_setting sim_det_actv_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+	.dir = GPIOMUX_IN,
+};
+static struct gpiomux_setting sim_det_susp_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+	.dir = GPIOMUX_IN,
+};
+
 /* GSBI10 UART configurations */
 static struct gpiomux_setting gsbi10_uart_cfg = {
-	.func = GPIOMUX_FUNC_2,
+	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
@@ -76,6 +114,22 @@ static struct gpiomux_setting spi_suspended_config = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
+#ifdef ORG_VER
+#else
+static struct gpiomux_setting plsensor_active_cfg = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+	.dir = GPIOMUX_IN,
+};
+
+static struct gpiomux_setting plsensor_suspend_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+#endif
+
 static struct gpiomux_setting gsbi3_suspended_cfg = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_2MA,
@@ -95,7 +149,7 @@ static struct gpiomux_setting gsbi9_active_cfg = {
 };
 
 static struct gpiomux_setting gsbi9_suspended_cfg = {
-	.func = GPIOMUX_FUNC_GPIO,
+	.func = GPIOMUX_FUNC_2,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
 };
@@ -118,11 +172,50 @@ static struct gpiomux_setting gsbi10 = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 
+#if 0
 static struct gpiomux_setting gsbi12 = {
 	.func = GPIOMUX_FUNC_1,
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_NONE,
 };
+#endif
+
+#if 1
+#if 0
+static struct gpiomux_setting gsbi1_sus_ecompass = {   //: not run this, only for ref
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_KEEPER,
+};
+#endif
+static struct gpiomux_setting gsbi1_init_ecompass = {  //== gsbi1_act_ecompass
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+#if 0
+static struct gpiomux_setting gsbi1_act_ecompass = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+#endif
+
+static struct gpiomux_setting gsbi12_init_g_sensor = {  //== gsbi12_act_g_sensor
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+#if 0
+static struct gpiomux_setting gsbi12_act_g_sensor = {
+	.func = GPIOMUX_FUNC_1,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+#endif
+#endif
 
 static struct gpiomux_setting external_vfr[] = {
 	/* Suspended state */
@@ -204,6 +297,7 @@ static struct gpiomux_setting wcnss_5wire_active_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
+#if 0
 static struct gpiomux_setting atmel_resout_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_6MA,
@@ -235,6 +329,31 @@ static struct gpiomux_setting atmel_int_act_cfg = {
 };
 
 static struct gpiomux_setting atmel_int_sus_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+#endif
+
+static struct gpiomux_setting cyttsp_resout_sus_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_6MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_OUT_HIGH,
+};
+
+static struct gpiomux_setting cyttsp_resout_act_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_6MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+static struct gpiomux_setting cyttsp_int_act_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_6MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+
+static struct gpiomux_setting cyttsp_int_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
@@ -287,6 +406,8 @@ static struct msm_gpiomux_config msm8930_hsusb_configs[] = {
 };
 #endif
 
+
+#if 0
 static struct gpiomux_setting hap_lvl_shft_suspended_config = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_2MA,
@@ -298,6 +419,7 @@ static struct gpiomux_setting hap_lvl_shft_active_config = {
 	.drv = GPIOMUX_DRV_8MA,
 	.pull = GPIOMUX_PULL_UP,
 };
+#endif
 
 static struct gpiomux_setting ap2mdm_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -408,6 +530,7 @@ static struct msm_gpiomux_config msm8960_ethernet_configs[] = {
 #endif
 
 static struct msm_gpiomux_config msm8960_gsbi_configs[] __initdata = {
+#if 0
 	{
 		.gpio      = 6,		/* GSBI1 QUP SPI_DATA_MOSI */
 		.settings = {
@@ -422,18 +545,29 @@ static struct msm_gpiomux_config msm8960_gsbi_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &spi_active,
 		},
 	},
+#endif
 	{
 		.gpio      = 8,		/* GSBI1 QUP SPI_CS_N */
 		.settings = {
+
+#if 0
 			[GPIOMUX_SUSPENDED] = &spi_suspended_config,
 			[GPIOMUX_ACTIVE] = &spi_active,
+#else
+			[GPIOMUX_SUSPENDED] = &gsbi1_init_ecompass,    //: when system boot will use this config
+#endif
 		},
 	},
 	{
 		.gpio      = 9,		/* GSBI1 QUP SPI_CLK */
 		.settings = {
+
+#if 0
 			[GPIOMUX_SUSPENDED] = &spi_suspended_config,
 			[GPIOMUX_ACTIVE] = &spi_active,
+#else
+			[GPIOMUX_SUSPENDED] = &gsbi1_init_ecompass,    //: when system boot will use this config
+#endif
 		},
 	},
 	{
@@ -465,7 +599,11 @@ static struct msm_gpiomux_config msm8960_gsbi_configs[] __initdata = {
 	{
 		.gpio      = 44,	/* GSBI12 I2C QUP SDA */
 		.settings = {
-			[GPIOMUX_SUSPENDED] = &gsbi12,
+
+			[GPIOMUX_SUSPENDED] = &gsbi12_init_g_sensor, //: when system boot will use this config
+#if 0
+			[GPIOMUX_ACTIVE] = &gsbi3_active_cfg,
+#endif
 		},
 	},
 	{
@@ -483,7 +621,11 @@ static struct msm_gpiomux_config msm8960_gsbi_configs[] __initdata = {
 	{
 		.gpio      = 45,	/* GSBI12 I2C QUP SCL */
 		.settings = {
-			[GPIOMUX_SUSPENDED] = &gsbi12,
+
+			[GPIOMUX_SUSPENDED] = &gsbi12_init_g_sensor,  //: when system boot will use this config
+#if 0
+			[GPIOMUX_ACTIVE] = &gsbi3_active_cfg,
+#endif
 		},
 	},
 	{
@@ -544,6 +686,7 @@ static struct msm_gpiomux_config msm8930_sglte_gsbi_configs[] __initdata = {
 			[GPIOMUX_ACTIVE] = &gsbi3_active_cfg,
 		},
 	},
+#if 0
 	{
 		.gpio      = 44,	/* GSBI12 I2C QUP SDA */
 		.settings = {
@@ -556,6 +699,7 @@ static struct msm_gpiomux_config msm8930_sglte_gsbi_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gsbi12,
 		},
 	},
+#endif
 	{
 		.gpio      = 73,	/* GSBI10 I2C QUP SDA */
 		.settings = {
@@ -704,6 +848,7 @@ static struct msm_gpiomux_config wcnss_5wire_interface[] = {
 	},
 };
 
+#if 0
 static struct msm_gpiomux_config msm8960_atmel_configs[] __initdata = {
 	{	/* TS INTERRUPT */
 		.gpio = 11,
@@ -727,6 +872,24 @@ static struct msm_gpiomux_config msm8960_atmel_configs[] __initdata = {
 		},
 	},
 };
+#endif
+
+static struct msm_gpiomux_config msm8960_cyttsp_configs[] __initdata = {
+	{	/* TS INTERRUPT */
+		.gpio = 11,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cyttsp_int_act_cfg,
+			[GPIOMUX_SUSPENDED] = &cyttsp_int_sus_cfg,
+		},
+	},
+	{	/* TS RESOUT */
+		.gpio = 52,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &cyttsp_resout_act_cfg,
+			[GPIOMUX_SUSPENDED] = &cyttsp_resout_sus_cfg,
+		},
+	},
+};
 
 static struct msm_gpiomux_config msm8960_synaptic_rmi4_configs[] __initdata = {
 	{       /* TS INTERRUPT */
@@ -745,6 +908,8 @@ static struct msm_gpiomux_config msm8960_synaptic_rmi4_configs[] __initdata = {
 	},
 };
 
+
+#if 0
 static struct msm_gpiomux_config hap_lvl_shft_config[] __initdata = {
 	{
 		.gpio = 47,
@@ -754,15 +919,18 @@ static struct msm_gpiomux_config hap_lvl_shft_config[] __initdata = {
 		},
 	},
 };
+#endif
 
 static struct msm_gpiomux_config mdm_configs[] __initdata = {
 	/* AP2MDM_STATUS */
+#if 0   //: used by e-compass
 	{
 		.gpio = 94,
 		.settings = {
 			[GPIOMUX_SUSPENDED] = &ap2mdm_cfg,
 		}
 	},
+#endif
 	/* MDM2AP_STATUS */
 	{
 		.gpio = 69,
@@ -770,6 +938,7 @@ static struct msm_gpiomux_config mdm_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &mdm2ap_status_cfg,
 		}
 	},
+#if 0   //: used by e-compass
 	/* MDM2AP_ERRFATAL */
 	{
 		.gpio = 70,
@@ -777,6 +946,7 @@ static struct msm_gpiomux_config mdm_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &mdm2ap_errfatal_cfg,
 		}
 	},
+#endif
 	/* AP2MDM_ERRFATAL */
 	{
 		.gpio = 95,
@@ -800,6 +970,51 @@ static struct msm_gpiomux_config mdm_configs[] __initdata = {
 	}
 };
 
+
+#if 1
+static struct msm_gpiomux_config msm8930_keypad_configs[] __initdata = {
+	{
+		.gpio      = 47,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &volume_key_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &volume_key_susp_cfg,
+		},
+	},
+	{
+		.gpio      = 48,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &volume_key_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &volume_key_susp_cfg,
+		},
+	},
+	{
+		.gpio      = 68,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &camera_key_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &camera_key_susp_cfg,
+		},
+	},
+	{
+		.gpio      = 69,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &camera_key_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &camera_key_susp_cfg,
+		},
+	},
+};
+#endif
+
+
+static struct msm_gpiomux_config msm8930_sim_det_configs[] __initdata = {
+	{
+		.gpio      = 33,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &sim_det_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &sim_det_susp_cfg,
+		},
+	},
+};
+
 static struct msm_gpiomux_config msm8960_mdp_vsync_configs[] __initdata = {
 	{
 		.gpio = 0,
@@ -809,6 +1024,18 @@ static struct msm_gpiomux_config msm8960_mdp_vsync_configs[] __initdata = {
 		},
 	}
 };
+#ifdef ORG_VER
+#else
+static struct msm_gpiomux_config msm8930_plsensor_configs[] __initdata = {
+	{
+		.gpio = 49,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &plsensor_active_cfg,
+			[GPIOMUX_SUSPENDED] = &plsensor_suspend_cfg,
+		},
+	},
+};
+#endif
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 static struct msm_gpiomux_config msm8960_hdmi_configs[] __initdata = {
@@ -903,6 +1130,7 @@ static struct gpiomux_setting sd_det_line = {
 	.pull = GPIOMUX_PULL_NONE,
 };
 
+#if 0
 static struct msm_gpiomux_config msm8930_sd_det_config[] __initdata = {
 	{
 		.gpio = 94,	/* SD Card Detect Line */
@@ -912,6 +1140,7 @@ static struct msm_gpiomux_config msm8930_sd_det_config[] __initdata = {
 		},
 	},
 };
+#endif
 
 static struct msm_gpiomux_config msm8930_sd_det_config_evt[] __initdata = {
 	{
@@ -1120,8 +1349,26 @@ int __init msm8930_init_gpiomux(void)
 	msm_gpiomux_install(msm8960_gsbi_configs,
 			ARRAY_SIZE(msm8960_gsbi_configs));
 
+#if 0
 	msm_gpiomux_install(msm8960_atmel_configs,
 			ARRAY_SIZE(msm8960_atmel_configs));
+#endif
+
+
+#if 1
+	msm_gpiomux_install(msm8930_keypad_configs,
+		ARRAY_SIZE(msm8930_keypad_configs));
+#endif
+
+
+#if defined(CONFIG_TOUCHSCREEN_CYTTSP3_I2C) && \
+		defined(CONFIG_TOUCHSCREEN_CYTTSP3_CORE)
+	msm_gpiomux_install(msm8960_cyttsp_configs,
+			ARRAY_SIZE(msm8960_cyttsp_configs));
+#endif
+
+	msm_gpiomux_install(msm8930_sim_det_configs,
+			ARRAY_SIZE(msm8930_sim_det_configs));
 
 	msm_gpiomux_install(msm8960_slimbus_config,
 			ARRAY_SIZE(msm8960_slimbus_config));
@@ -1143,8 +1390,12 @@ int __init msm8930_init_gpiomux(void)
 
 	if (machine_is_msm8930_mtp() || machine_is_msm8930_fluid() ||
 		machine_is_msm8930_cdp()) {
+		
+		#if 0
 		msm_gpiomux_install(hap_lvl_shft_config,
 			ARRAY_SIZE(hap_lvl_shft_config));
+		#endif
+
 #ifdef MSM8930_PHASE_2
 		msm_gpiomux_install(msm8930_hsusb_configs,
 			ARRAY_SIZE(msm8930_hsusb_configs));
@@ -1171,8 +1422,16 @@ int __init msm8930_init_gpiomux(void)
 	msm_gpiomux_install(msm8960_mdp_vsync_configs,
 			ARRAY_SIZE(msm8960_mdp_vsync_configs));
 
+#if 0
 	msm_gpiomux_install(msm8930_sd_det_config,
 			ARRAY_SIZE(msm8930_sd_det_config));
+#endif
+
+#ifdef ORG_VER
+#else
+	msm_gpiomux_install(msm8930_plsensor_configs,
+			ARRAY_SIZE(msm8930_plsensor_configs));
+#endif
 
 	if (machine_is_msm8930_fluid() || machine_is_msm8930_mtp())
 		msm_gpiomux_install(msm8930_gyro_int_config,
