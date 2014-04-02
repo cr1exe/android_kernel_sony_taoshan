@@ -76,8 +76,7 @@ int platform_cpu_kill(unsigned int cpu)
 	int ret = 0;
 
 	if (cpumask_test_and_clear_cpu(cpu, &cpu_dying_mask))
-		ret = msm_pm_wait_cpu_shutdown(cpu);
-
+	ret = msm_pm_wait_cpu_shutdown(cpu);
 	return ret ? 0 : 1;
 }
 
