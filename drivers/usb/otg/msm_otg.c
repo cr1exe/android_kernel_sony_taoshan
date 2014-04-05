@@ -1206,7 +1206,7 @@ static void msm_otg_start_host(struct usb_otg *otg, int on)
 		/*
 		 * Increase 3.3V rail voltage to increase cross over voltage.
 		 * This is required to get some full speed audio headsets
-		 * working.
+		 * working properly.
 		 */
 		rc = regulator_set_voltage(hsusb_3p3, USB_PHY_3P3_VOL_MAX,
 				USB_PHY_3P3_VOL_MAX);
