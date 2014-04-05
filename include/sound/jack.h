@@ -5,6 +5,7 @@
  *  Jack abstraction layer
  *
  *  Copyright 2008 Wolfson Microelectronics plc
+ *  Copyright (C) 2014 Sony Mobile Communications AB.
  *
  *
  *   This program is free software; you can redistribute it and/or modify
