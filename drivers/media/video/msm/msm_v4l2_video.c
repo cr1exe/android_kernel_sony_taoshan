@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/time.h>
+#include <linux/module.h>
 #include <linux/videodev2.h>
 #include <linux/platform_device.h>
 #include <linux/file.h>
@@ -733,16 +734,17 @@ msm_v4l2_overlay_mmap(struct file *filp, struct vm_area_struct * vma)
 	 */
 	start &= PAGE_MASK;
 
+
+	pr_debug("v4l2 map req for phys(%p,%p) offset %u to virt (%p,%p)\n",
+	(void *)(start+off), (void *)(start+off+(vma->vm_end - vma->vm_start)),
+	(unsigned int)off, (void *)vma->vm_start, (void *)vma->vm_end);
+
 	if ((vma->vm_end <= vma->vm_start) ||
 	    (off >= len) ||
 	    ((vma->vm_end - vma->vm_start) > (len - off))) {
 		pr_err("v4l2 map request, memory requested out of bounds\n");
 		return -EINVAL;
 	}
-
-	pr_debug("v4l2 map req for phys(%p,%p) offset %u to virt (%p,%p)\n",
-	(void *)(start+off), (void *)(start+off+(vma->vm_end - vma->vm_start)),
-	(unsigned int)off, (void *)vma->vm_start, (void *)vma->vm_end);
 
 	start += off;
 	if (start < off)

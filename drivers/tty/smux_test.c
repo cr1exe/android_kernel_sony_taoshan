@@ -634,11 +634,11 @@ static int smux_ut_basic_core(char *buf, int max,
 		ret = msm_smux_close(SMUX_TEST_LCID);
 		UT_ASSERT_INT(ret, ==, 0);
 		while (cb_data.cb_count < 3) {
-			UT_ASSERT_INT(
-				(int)wait_for_completion_timeout(
-					&cb_data.cb_completion, HZ),
-				>, 0);
-			INIT_COMPLETION(cb_data.cb_completion);
+		UT_ASSERT_INT(
+			(int)wait_for_completion_timeout(
+				&cb_data.cb_completion, HZ),
+			>, 0);
+		INIT_COMPLETION(cb_data.cb_completion);
 		}
 		UT_ASSERT_INT(cb_data.cb_count, ==, 3);
 		UT_ASSERT_INT(cb_data.event_disconnected, ==, 1);

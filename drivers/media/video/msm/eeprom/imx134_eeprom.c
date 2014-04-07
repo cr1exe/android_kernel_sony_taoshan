@@ -1,5 +1,5 @@
 /* Copyright (c) 2012, Code Aurora Forum. All rights reserved.
- * Copyright (C) 2012 Sony Mobile Communications AB.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -58,7 +58,6 @@ uint8_t imx134_lsccalib_data[768];
 struct msm_calib_wb32 imx134_wb_data[3];
 struct msm_calib_af imx134_af_data;
 struct msm_calib_lsc imx134_lsc_data;
-//struct msm_calib_dpc imx134_dpc_data;
 
 static struct msm_camera_eeprom_info_t imx134_calib_supp_info = {
 	{TRUE, 6, 1, 1},
@@ -92,20 +91,9 @@ static struct msm_camera_eeprom_data_t imx134_eeprom_data_tbl[] = {
 
 static void imx134_format_wbdata(void)
 {
-    int i;//,j;
+    int i;
     for(i=0; i<3; i++)
     {
-        /*
-    	imx134_wb_data[i].r_over_g = (uint32_t)(imx134_wbcalib_data[3+12*i] << 24) | 
-            (imx134_wbcalib_data[2+12*i] << 16) |(imx134_wbcalib_data[1+12*i] << 8) |
-    		(imx134_wbcalib_data[0+12*i]);
-    	imx134_wb_data[i].b_over_g = (uint32_t)(imx134_wbcalib_data[7+12*i] << 24) | 
-            (imx134_wbcalib_data[6+12*i] << 16) |(imx134_wbcalib_data[5+12*i] << 8) |
-    		(imx134_wbcalib_data[4+12*i]);
-    	imx134_wb_data[i].gr_over_gb = (uint32_t)(imx134_wbcalib_data[11+12*i] << 24) | 
-            (imx134_wbcalib_data[10+12*i] << 16) |(imx134_wbcalib_data[9+12*i] << 8) |
-    		(imx134_wbcalib_data[8+12*i]);
-        */
     // Follow IMX134 EEPROM format
     imx134_wb_data[i].r_over_g = (uint32_t)(imx134_wbcalib_data[0+12*i] << 24) | 
             (imx134_wbcalib_data[1+12*i] << 16) |(imx134_wbcalib_data[2+12*i] << 8) |
@@ -117,22 +105,10 @@ static void imx134_format_wbdata(void)
             (imx134_wbcalib_data[9+12*i] << 16) |(imx134_wbcalib_data[10+12*i] << 8) |
              (imx134_wbcalib_data[11+12*i]);
     }
-    /*
-    for(i=0; i<3; i++)
-    {
-        pr_err("%s: array[%d]:\n", __func__, i); 
-        for (j=0; j<12; j++)
-        {
-            pr_err("%d(0x%x),", j, imx134_wbcalib_data[i*12+j]); 
-        }
-    }
-    pr_err("\n"); 
-    */
 }
 
 static void imx134_format_afdata(void)
 {
-    //int i;
 	imx134_af_data.inf_dac = (uint16_t)(imx134_afcalib_data[0] << 8) |
 		imx134_afcalib_data[1];
 	imx134_af_data.macro_dac = (uint16_t)(imx134_afcalib_data[2] << 8) |
@@ -140,40 +116,16 @@ static void imx134_format_afdata(void)
 	imx134_af_data.start_dac = (uint16_t)(imx134_afcalib_data[4] << 8) |
 		imx134_afcalib_data[5];
 
-    //for(i=0; i<6; i++)
-    //{
-        //pr_err("%s: %d(%d)\n", __func__, i, imx134_afcalib_data[i]); 
-    //}
 }
 
 static void imx134_format_lscdata(void)
 {
     int i,j;
-    /*
-    for(i=0; i<12; i++)
-    {
-        //pr_err("%s: array[%d]:\n", __func__, i); 
-        for (j=0; j<7; j++)
-        {
-            char strtemp[128];
-
-            strtemp[0] = '\0';
-
-            for (k=0; k<9; k++)
-            {
-               sprintf(strtemp+strlen(strtemp),"%d(0x%x),", j*9+k, imx134_lsccalib_data[i*64+j*9+k]); 
-            }
-            //pr_err("%s",strtemp); 
-        }
-        //pr_err("c=%d(0x%x)", j, imx134_lsccalib_data[63]); 
-    }*/
 
     for(i=0; i<12; i++)
     {
-        //pr_err("%s: array[%d]:\n", __func__, i); 
         for (j=0; j<64; j++)
         {
-            //pr_err("%d(0x%x),", j, imx134_lsccalib_data[i*64+j]); 
         }
     }
 
@@ -255,44 +207,12 @@ int imx134_eeprom_init(struct msm_eeprom_ctrl_t *ectrl,
     unsigned char rxdata[64];
     unsigned char memoryaddr[2];
 
-    //pr_err("%s enter", __func__);
     memset(imx134_afcalib_data, sizeof(imx134_afcalib_data), 0);
     memset(imx134_wbcalib_data, sizeof(imx134_wbcalib_data), 0);
     memset(imx134_lsccalib_data, sizeof(imx134_lsccalib_data), 0);
  
    memset((void *)memoryaddr,0,sizeof(memoryaddr));
-   /*
-   {
-	    struct i2c_msg msgs[] = {
-		    {
-			    .addr  = 0xA1 >> 1,
-			    .flags = 0,
-			    .len   = 1,
-			    .buf   = memoryaddr,
-		    },
-		    {
-			    .addr  = 0xA1 >> 1,
-			    .flags = I2C_M_RD,
-			    .len   = 64,
-			    .buf   = rxdata,
-		    },
-	    };
 
-        memset((void *)rxdata,0,sizeof(rxdata));
-	    rc = i2c_transfer(adapter, msgs, 2);
-	    if (rc < 0)
-        {
-            //pr_err("%s i2c error %d", __func__,rc);
-        }
-
-        //pr_err("Read A1");
-
-        for (i=0; i<64; i++)
-        {
-            //pr_err("RX:%d(0x%x) %c", i, rxdata[i], rxdata[i]); 
-        }
-    }
-    */
     {
 	    struct i2c_msg msgs[] = {
 		    {
@@ -313,7 +233,6 @@ int imx134_eeprom_init(struct msm_eeprom_ctrl_t *ectrl,
 	    rc = i2c_transfer(adapter, msgs, 2);
 	    if (rc < 0)
         {
-            //pr_err("%s i2c error %d", __func__,rc);
         }
     }
     {
@@ -336,7 +255,6 @@ int imx134_eeprom_init(struct msm_eeprom_ctrl_t *ectrl,
 	    rc = i2c_transfer(adapter, msgs, 2);
 	    if (rc < 0)
         {
-            //pr_err("%s i2c error %d", __func__,rc);
         }
     }
     {
@@ -359,7 +277,6 @@ int imx134_eeprom_init(struct msm_eeprom_ctrl_t *ectrl,
 	    rc = i2c_transfer(adapter, msgs, 2);
 	    if (rc < 0)
         {
-            //pr_err("%s i2c error %d", __func__,rc);
         }
     }
 

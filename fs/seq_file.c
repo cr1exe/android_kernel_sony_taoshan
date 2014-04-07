@@ -215,6 +215,7 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 	pos = m->index;
 	p = m->op->start(m, &pos);
 	while (1) {
+
 		err = PTR_ERR(p);
 		if (!p || IS_ERR(p))
 			break;
@@ -233,6 +234,7 @@ ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 		m->op->stop(m, p);
 		is_vmalloc_addr(m->buf) ? vfree(m->buf) : kfree(m->buf);
 		m->buf = kmalloc(m->size <<= 1, GFP_KERNEL | __GFP_NOWARN);
+
 		if (!m->buf)
 			m->buf = vmalloc(m->size);
 		if (!m->buf)

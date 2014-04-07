@@ -201,9 +201,8 @@ static void get_encap_work(struct work_struct *w)
 		usb_unanchor_urb(dev->rcvurb);
 		usb_autopm_put_interface(dev->intf);
 		if (status != -ENODEV)
-			dev_err(dev->devicep,
-			"%s: Error submitting Read URB %d\n",
-			__func__, status);
+		dev_err(dev->devicep,
+		"%s: Error submitting Read URB %d\n", __func__, status);
 		goto resubmit_int_urb;
 	}
 
@@ -217,8 +216,7 @@ resubmit_int_urb:
 		if (status) {
 			usb_unanchor_urb(dev->inturb);
 			if (status != -ENODEV)
-				dev_err(dev->devicep,
-				"%s: Error re-submitting Int URB %d\n",
+			dev_err(dev->devicep, "%s: Error re-submitting Int URB %d\n",
 				__func__, status);
 		}
 	}
@@ -290,10 +288,9 @@ resubmit_int_urb:
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
 		usb_unanchor_urb(urb);
-		if (status != -ENODEV)
-			dev_err(dev->devicep,
-			"%s: Error re-submitting Int URB %d\n",
-			__func__, status);
+	if (status != -ENODEV)
+		dev_err(dev->devicep, "%s: Error re-submitting Int URB %d\n",
+		__func__, status);
 	}
 
 	return;
@@ -390,8 +387,7 @@ resubmit_int_urb:
 		if (status) {
 			usb_unanchor_urb(dev->inturb);
 			if (status != -ENODEV)
-				dev_err(dev->devicep,
-				"%s: Error re-submitting Int URB %d\n",
+			dev_err(dev->devicep, "%s: Error re-submitting Int URB %d\n",
 				__func__, status);
 		}
 	}
@@ -406,8 +402,7 @@ int rmnet_usb_ctrl_start_rx(struct rmnet_ctrl_dev *dev)
 	if (retval < 0) {
 		usb_unanchor_urb(dev->inturb);
 		if (retval != -ENODEV)
-			dev_err(dev->devicep,
-			"%s Intr submit %d\n", __func__, retval);
+		dev_err(dev->devicep, "%s Intr submit %d\n", __func__, retval);
 	}
 
 	return retval;
@@ -537,8 +532,7 @@ static int rmnet_usb_ctrl_write(struct rmnet_ctrl_dev *dev,
 	result = usb_submit_urb(sndurb, GFP_KERNEL);
 	if (result < 0) {
 		if (result != -ENODEV)
-			dev_err(dev->devicep,
-			"%s: Submit URB error %d\n",
+		dev_err(dev->devicep, "%s: Submit URB error %d\n",
 			__func__, result);
 		dev->snd_encap_cmd_cnt--;
 		usb_autopm_put_interface(dev->intf);

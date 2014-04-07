@@ -342,7 +342,7 @@ int mdp4_overlay_iommu_map_buf(int mem_id,
 		if(map_size < size)
 			map_size = size;
 
-		if (ion_map_iommu(display_iclient, *srcp_ihdl,
+	if (ion_map_iommu(display_iclient, *srcp_ihdl,
 				DISPLAY_READ_DOMAIN, GEN_POOL, SZ_4K, map_size, start,
 				len, 0, 0)) {
 			ion_free(display_iclient, *srcp_ihdl);

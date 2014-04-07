@@ -373,6 +373,7 @@ struct eui64_id {
 	u8 ieee_company_id[3];
 	u8 vendor_specific_ext_field[5];
 } __packed;
+
 /* Data shared by all the FSG instances. */
 struct fsg_common {
 	struct usb_gadget	*gadget;

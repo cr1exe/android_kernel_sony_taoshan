@@ -1916,7 +1916,7 @@ static int imx134_write_proc(struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
 	int *buf;
-    int i,addr;
+	int i,addr;
 
 	if (count < 1)
 		return -EINVAL;

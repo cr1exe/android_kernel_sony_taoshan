@@ -521,6 +521,8 @@ ath_regd_init_wiphy(struct ath_regulatory *reg,
 		regd = ath_world_regdomain(reg);
 		wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
 		wiphy->country_ie_pref = NL80211_COUNTRY_IE_FOLLOW_POWER;
+
+
 	} else {
 		/*
 		 * This gets applied in the case of the absence of CRDA,
@@ -529,6 +531,8 @@ ath_regd_init_wiphy(struct ath_regulatory *reg,
 		 */
 		regd = ath_default_world_regdomain();
 	}
+
+
 	wiphy_apply_custom_regulatory(wiphy, regd);
 	ath_reg_apply_radar_flags(wiphy);
 	ath_reg_apply_world_flags(wiphy, NL80211_REGDOM_SET_BY_DRIVER, reg);
