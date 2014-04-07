@@ -56,6 +56,24 @@
 #define TEMP_IAVG_STORAGE	0x105
 #define TEMP_IAVG_STORAGE_USE_MASK	0x0F
 
+#if defined(ORG_VER)
+#else
+#define CONFIG_PM8038_CHG_DEBUG 1
+#if(CONFIG_PM8038_CHG_DEBUG)
+    #define PrintLog_DEBUG(fmt, args...)    printk(KERN_INFO "CH(L)=> "pr_fmt(fmt), ##args)
+    #define PrintLog_PRDEBUG(fmt, args...)    printk(KERN_INFO "CH(L)=> "pr_fmt(fmt), ##args)
+#else
+    #define PrintLog_DEBUG(fmt, args...)
+#endif
+
+#define CONFIG_PM8038_CHG_INFO 1
+#if(CONFIG_PM8038_CHG_INFO)
+    #define PrintLog_INFO(fmt, args...)    printk(KERN_INFO "CH(L)=> "pr_fmt(fmt), ##args)
+#else
+    #define PrintLog_INFO(fmt, args...)
+#endif
+#endif
+
 #define PON_CNTRL_6		0x018
 #define WD_BIT			BIT(7)
 
@@ -233,6 +251,16 @@ static int last_soc = -EINVAL;
 static int last_real_fcc_mah = -EINVAL;
 static int last_real_fcc_batt_temp = -EINVAL;
 static int battery_removed;
+
+#if defined(ORG_VER)
+#else
+static char FuelGauge_drv_FW_version[] = "0002";
+
+char * get_FuelGauge_drv_version(void)
+{
+	return FuelGauge_drv_FW_version;
+}
+#endif
 
 static int pm8921_battery_gauge_alarm_notify(struct notifier_block *nb,
 				unsigned long status, void *unused);
@@ -2124,10 +2152,6 @@ static int scale_soc_while_chg(struct pm8921_bms_chip *chip,
 	if (the_chip->start_percent == -EINVAL)
 		return prev_soc;
 
-	/* do not scale at 100 */
-	if (new_soc == 100)
-		return new_soc;
-
 	chg_time_sec = DIV_ROUND_UP(the_chip->charge_time_us, USEC_PER_SEC);
 	catch_up_sec = DIV_ROUND_UP(the_chip->catch_up_time_us, USEC_PER_SEC);
 	if (catch_up_sec == 0)
@@ -2284,6 +2308,7 @@ static int calculate_state_of_charge(struct pm8921_bms_chip *chip,
 	int new_calculated_soc;
 	static int firsttime = 1;
 
+	calib_hkadc_check(chip, batt_temp);
 	calculate_soc_params(chip, raw, batt_temp, chargecycles,
 						&fcc_uah,
 						&unusable_charge_uah,
@@ -2431,7 +2456,6 @@ static int recalculate_soc(struct pm8921_bms_chip *chip)
 	get_batt_temp(chip, &batt_temp);
 
 	mutex_lock(&chip->last_ocv_uv_mutex);
-	calib_hkadc_check(chip, batt_temp);
 	read_soc_params_raw(chip, &raw, batt_temp);
 
 	soc = calculate_state_of_charge(chip, &raw,
@@ -2511,7 +2535,7 @@ static int report_state_of_charge(struct pm8921_bms_chip *chip)
 	}
 
 	/* last_soc < soc  ... scale and catch up */
-	if (last_soc != -EINVAL && last_soc < soc)
+	if (last_soc != -EINVAL && last_soc < soc && soc != 100)
 		soc = scale_soc_while_chg(chip, delta_time_us, soc, last_soc);
 
 	if (last_soc != -EINVAL) {
@@ -3205,11 +3229,19 @@ palladium:
 		chip->fcc_temp_lut = palladium_1500_data.fcc_temp_lut;
 		chip->fcc_sf_lut = palladium_1500_data.fcc_sf_lut;
 		chip->pc_temp_ocv_lut = palladium_1500_data.pc_temp_ocv_lut;
+		#ifdef ORG_VER
 		chip->pc_sf_lut = palladium_1500_data.pc_sf_lut;
+                #else
+		chip->pc_sf_lut = NULL;
+		#endif
 		chip->rbatt_sf_lut = palladium_1500_data.rbatt_sf_lut;
 		chip->default_rbatt_mohm
 				= palladium_1500_data.default_rbatt_mohm;
+		#ifdef ORG_VER
 		chip->delta_rbatt_mohm = palladium_1500_data.delta_rbatt_mohm;
+                #else
+		chip->delta_rbatt_mohm = 0;
+		#endif
 		chip->rbatt_capacitive_mohm
 			= palladium_1500_data.rbatt_capacitive_mohm;
 		return 0;
@@ -3901,8 +3933,13 @@ static int pm8921_bms_resume(struct device *dev)
 				chip->last_recalc_time;
 		pr_debug("Time since last recalc: %lu\n",
 				time_since_last_recalc);
+#ifdef ORG_VER
 		if ((time_since_last_recalc * 1000) >=
 					chip->soc_calc_period) {
+#else
+		if ((time_since_last_recalc * 1000) >=
+					180000) {
+#endif
 			chip->last_recalc_time = tm_now_sec;
 			recalculate_soc(chip);
 			chip->soc_updated_on_resume = true;
