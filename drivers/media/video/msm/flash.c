@@ -1,5 +1,6 @@
 
 /* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -20,28 +21,37 @@
 #include <linux/export.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
+#include <linux/leds-lm3561.h>
 #include <mach/pmic.h>
 #include <mach/camera.h>
 #include <mach/gpio.h>
 #include "msm_camera_i2c.h"
+#include "sensors/msm_sensor.h"
 
 struct flash_work {
 	struct work_struct my_work;
 	int    x;
 };
 struct flash_work *work;
+#ifndef CONFIG_LEDS_LM3561
 static struct timer_list flash_timer;
 static int timer_state;
 static struct workqueue_struct *flash_wq;
+static struct msm_camera_i2c_client i2c_client;
+#endif
 struct i2c_client *sx150x_client;
 struct timer_list timer_flash;
 static struct msm_camera_sensor_info *sensor_data;
-static struct msm_camera_i2c_client i2c_client;
 enum msm_cam_flash_stat{
 	MSM_CAM_FLASH_OFF,
 	MSM_CAM_FLASH_ON,
 };
+int flash_auto = 0;
 
+// Texas Instruments CAMERA FLASH LED
+#ifdef CONFIG_LEDS_LM3561
+static struct led_classdev *lm3561 = NULL;
+#else
 static struct i2c_client *sc628a_client;
 
 static const struct i2c_device_id sc628a_i2c_id[] = {
@@ -123,6 +133,8 @@ static struct i2c_driver tps61310_i2c_driver = {
 		.name = "tps61310",
 	},
 };
+#endif
+
 
 static int config_flash_gpio_table(enum msm_cam_flash_stat stat,
 			struct msm_camera_sensor_strobe_flash_data *sfdata)
@@ -287,6 +299,8 @@ int msm_camera_flash_led(
 	return rc;
 }
 
+
+#ifndef CONFIG_LEDS_LM3561
 static void flash_wq_function(struct work_struct *work)
 {
 	if (tps61310_client) {
@@ -304,6 +318,8 @@ void flash_timer_callback(unsigned long data)
 	mod_timer(&flash_timer, jiffies + msecs_to_jiffies(10000));
 }
 
+#endif
+
 int msm_camera_flash_external(
 	struct msm_camera_sensor_flash_external *external,
 	unsigned led_state)
@@ -312,6 +328,36 @@ int msm_camera_flash_external(
 
 	switch (led_state) {
 
+#ifdef CONFIG_LEDS_LM3561
+    case MSM_CAMERA_LED_INIT:
+        lm3561 = lm3561_init();
+        break;
+    case MSM_CAMERA_LED_RELEASE:
+        lm3561_release(lm3561);
+        lm3561 = NULL;
+        break;
+    case MSM_CAMERA_LED_OFF:
+        if (flash_auto && board_type_with_hw_id() > DVT2_BOARD_HW_ID) {
+            flash_auto = 0;
+        } else {
+            lm3561_flash_set(lm3561, 0);
+        }
+        break;
+    case MSM_CAMERA_LED_LOW:
+        lm3561_torch_set(lm3561, 1);
+        break;
+    case MSM_CAMERA_LED_HIGH:
+        if (board_type_with_hw_id() <= DVT2_BOARD_HW_ID) {
+            lm3561_flash_set(lm3561, 1);
+        } else {
+            msm_sensor_set_flash(1);
+            flash_auto = 1;
+        }
+        break;
+    default:
+        rc = -EFAULT;
+        break;
+#else
 	case MSM_CAMERA_LED_INIT:
 		if (external->flash_id == MAM_CAMERA_EXT_LED_FLASH_SC628A) {
 			if (!sc628a_client) {
@@ -499,6 +545,8 @@ error:
 	default:
 		rc = -EFAULT;
 		break;
+#endif
+
 	}
 	return rc;
 }
