@@ -125,6 +125,23 @@
 #define PM8XXX_ADC_BTM_INTERVAL_MAX			0x14
 #define PM8XXX_ADC_COMPLETION_TIMEOUT			(2 * HZ)
 
+#if defined(ORG_VER)
+#else
+#define CONFIG_PM8038_CHG_DEBUG 0
+#if(CONFIG_PM8038_CHG_DEBUG)
+    #define PrintLog_DEBUG(fmt, args...)    printk(KERN_INFO "CH(L)=> "pr_fmt(fmt), ##args)
+#else
+    #define PrintLog_DEBUG(fmt, args...)
+#endif
+
+#define CONFIG_PM8038_CHG_INFO 1
+#if(CONFIG_PM8038_CHG_INFO)
+    #define PrintLog_INFO(fmt, args...)    printk(KERN_INFO "CH(L)=> "pr_fmt(fmt), ##args)
+#else
+    #define PrintLog_INFO(fmt, args...)
+#endif
+#endif
+
 struct pm8xxx_adc {
 	struct device				*dev;
 	struct pm8xxx_adc_properties		*adc_prop;
@@ -200,6 +217,67 @@ static struct pm8xxx_mpp_config_data pm8xxx_adc_mpp_unconfig = {
 
 static bool pm8xxx_adc_calib_first_adc;
 static bool pm8xxx_adc_initialized, pm8xxx_adc_calib_device_init;
+
+#if defined(ORG_VER)
+#else
+extern bool btm_calibrate(const char *buf, size_t count);
+extern bool pm8921_adc_btm_reconfigure(void);
+static int CalibrateBTM = 0;
+#define NV_BTM_SIZE 80
+static ssize_t CalibrateBTM_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", CalibrateBTM);
+}
+
+static ssize_t CalibrateBTM_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	char  Calibrated_BTM_raw[NV_BTM_SIZE];
+	int i=0;
+	char tmp1=0, tmp2=0;
+
+	memset(Calibrated_BTM_raw, 0, NV_BTM_SIZE);
+	for(i=0;i<count-1;i++)
+	{
+		if ((buf[i]>='0') && (buf[i]<='9'))
+		{
+			tmp1=(char)(buf[i]-'0');
+		}
+		else if((buf[i]>='A') && (buf[i]<='F'))
+		{
+			tmp1=(char)(buf[i]-'A'+10);
+		}
+		else if((buf[i]>='a') && (buf[i]<='f'))
+		{
+			tmp1=(char)(buf[i]-'a'+10);
+		}
+		else
+		{
+			tmp1=0x00;
+		}
+		if(i%2)
+		{
+			tmp2|=tmp1;
+			Calibrated_BTM_raw[i/2]=tmp2;
+		}
+		else
+		{
+			tmp2=tmp1<<4;
+		}
+	}
+
+	if (!CalibrateBTM) {
+		PrintLog_INFO("Calibrate_BTM\n");
+		if(btm_calibrate(Calibrated_BTM_raw, NV_BTM_SIZE))
+			if(pm8921_adc_btm_reconfigure())
+				CalibrateBTM = 1;
+	}
+	return count;
+}
+static DEVICE_ATTR(CalibrateBTM, 0644, CalibrateBTM_show , CalibrateBTM_store);
+
+#endif
 
 static int32_t pm8xxx_adc_check_channel_valid(uint32_t channel)
 {
@@ -311,7 +389,17 @@ static int32_t pm8xxx_adc_channel_power_enable(uint32_t channel,
 
 	switch (channel) {
 	case ADC_MPP_1_AMUX8:
+#ifdef ORG_VER
+#else
+    case CHANNEL_BATT_THERM:
+	case ADC_MPP_1_AMUX3:
+	case ADC_MPP_1_AMUX4:
+#endif
 		rc = pm8xxx_adc_patherm_power(power_cntrl);
+#ifdef ORG_VER
+#else
+        msleep(1);
+#endif
 		break;
 	case CHANNEL_DIE_TEMP:
 	case CHANNEL_MUXOFF:
@@ -1129,6 +1217,14 @@ static int32_t pm8xxx_adc_init_hwmon(struct platform_device *pdev)
 		}
 	}
 
+#if defined(ORG_VER)
+#else
+		rc = device_create_file(&pdev->dev, &dev_attr_CalibrateBTM);
+		if (rc) {
+			PrintLog_INFO("unable to create file for dev_attr_CalibrateBTM\n");
+		}
+#endif
+
 	return 0;
 hwmon_err_sens:
 	pr_info("Init HWMON failed for pm8xxx_adc with %d\n", rc);
@@ -1179,6 +1275,12 @@ static int __devexit pm8xxx_adc_teardown(struct platform_device *pdev)
 	for (i = 0; i < adc_pmic->adc_num_board_channel; i++)
 		device_remove_file(adc_pmic->dev,
 				&adc_pmic->sens_attr[i].dev_attr);
+
+#if defined(ORG_VER)
+#else
+	device_remove_file(adc_pmic->dev, &dev_attr_CalibrateBTM);
+#endif
+
 	pm8xxx_adc_initialized = false;
 
 	return 0;
@@ -1195,6 +1297,11 @@ static int __devinit pm8xxx_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "no platform data?\n");
 		return -EINVAL;
 	}
+
+#if defined(ORG_VER)
+#else
+	PrintLog_INFO("Begin\n");
+#endif
 
 	adc_pmic = devm_kzalloc(&pdev->dev, sizeof(struct pm8xxx_adc) +
 			(sizeof(struct sensor_device_attribute) *
@@ -1302,6 +1409,12 @@ static int __devinit pm8xxx_adc_probe(struct platform_device *pdev)
 		pr_err("failed to request pa_therm vreg with error %d\n", rc);
 		pa_therm = NULL;
 	}
+
+#if defined(ORG_VER)
+#else
+	PrintLog_INFO("End\n");
+#endif
+
 	return 0;
 }
 
