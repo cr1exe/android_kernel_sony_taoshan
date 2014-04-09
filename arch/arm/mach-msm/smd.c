@@ -2,6 +2,7 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Sony Mobile Communications AB.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -3601,10 +3602,12 @@ static struct platform_driver msm_smd_driver = {
 	},
 };
 
+
 int __init msm_smd_init(void)
 {
 	static bool registered;
 	int rc;
+
 
 	if (registered)
 		return 0;

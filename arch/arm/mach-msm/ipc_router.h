@@ -237,6 +237,7 @@ int msm_ipc_router_register_server(struct msm_ipc_port *server_port,
 			    struct msm_ipc_addr *name);
 int msm_ipc_router_unregister_server(struct msm_ipc_port *server_port);
 
+
 int msm_ipc_router_init_sockets(void);
 void msm_ipc_router_exit_sockets(void);
 

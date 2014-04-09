@@ -270,6 +270,7 @@ static int msm_mpm_set_irq_type_exclusive(
 		else
 			msm_mpm_detect_ctl[index] &= ~mask;
 
+
 		if (flow_type & (IRQ_TYPE_EDGE_RISING | IRQ_TYPE_LEVEL_HIGH))
 			msm_mpm_polarity[index] |= mask;
 		else

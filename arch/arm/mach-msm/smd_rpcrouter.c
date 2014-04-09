@@ -1582,6 +1582,7 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 		   be32_to_cpu(rq->prog), be32_to_cpu(rq->vers),
 		   ept->dst_pid, ept->dst_cid, count);
 	} else {
+
 		/* RPC REPLY */
 		reply = get_pend_reply(ept, rq->xid);
 		if (!reply) {

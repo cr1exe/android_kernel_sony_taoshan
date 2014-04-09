@@ -947,6 +947,7 @@ int __init msm_rpm_init(struct msm_rpm_platform_data *data)
 {
 	int rc;
 
+
 	memcpy(&msm_rpm_data, data, sizeof(struct msm_rpm_platform_data));
 	msm_rpm_sel_mask_size = msm_rpm_data.sel_last / 32 + 1;
 	BUG_ON(SEL_MASK_SIZE < msm_rpm_sel_mask_size);

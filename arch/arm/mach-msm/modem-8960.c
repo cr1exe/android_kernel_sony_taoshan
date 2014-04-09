@@ -46,6 +46,7 @@ static void log_modem_sfr(void)
 	u32 size;
 	char *smem_reason, reason[MAX_SSR_REASON_LEN];
 
+
 	smem_reason = smem_get_entry(SMEM_SSR_REASON_MSS0, &size);
 	if (!smem_reason || !size) {
 		pr_err("modem subsystem failure reason: (unknown, smem_get_entry failed).\n");
@@ -304,6 +305,7 @@ static int __init modem_8960_init(void)
 		smsm_state_cb, 0);
 	register_reboot_notifier(&shutdown_notifier);
 	mdm_driver_register_notifier("external_modem", &qsc_powerup_notifier);
+
 	if (ret < 0)
 		pr_err("%s: Unable to register SMSM callback! (%d)\n",
 				__func__, ret);
