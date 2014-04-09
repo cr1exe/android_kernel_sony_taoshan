@@ -1038,6 +1038,8 @@ void kgsl_idle_check(struct work_struct *work)
 		return;
 
 	mutex_lock(&device->mutex);
+	if (device->state & (KGSL_STATE_ACTIVE | KGSL_STATE_NAP)) {
+		kgsl_pwrscale_idle(device);
 
 	kgsl_pwrscale_idle(device);
 
@@ -1110,6 +1112,21 @@ void kgsl_pre_hwaccess(struct kgsl_device *device)
 	BUG_ON(!kgsl_pwrctrl_isenabled(device));
 }
 EXPORT_SYMBOL(kgsl_pre_hwaccess);
+
+void kgsl_check_suspended(struct kgsl_device *device)
+{
+	if (device->requested_state == KGSL_STATE_SUSPEND ||
+				device->state == KGSL_STATE_SUSPEND) {
+		mutex_unlock(&device->mutex);
+		wait_for_completion(&device->hwaccess_gate);
+		mutex_lock(&device->mutex);
+	} else if (device->state == KGSL_STATE_DUMP_AND_FT) {
+		mutex_unlock(&device->mutex);
+		wait_for_completion(&device->ft_gate);
+		mutex_lock(&device->mutex);
+	} else if (device->state == KGSL_STATE_SLUMBER)
+		kgsl_pwrctrl_wake(device);
+}
 
 static int
 _nap(struct kgsl_device *device)

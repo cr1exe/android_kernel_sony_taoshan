@@ -1559,6 +1559,8 @@ static int __devexit adreno_remove(struct platform_device *pdev)
 
 	kgsl_pwrscale_detach_policy(device);
 	kgsl_pwrscale_close(device);
+	if (adreno_is_a305(adreno_dev))
+		kgsl_sharedmem_free(&adreno_dev->on_resume_cmd);
 
 	adreno_ringbuffer_close(&adreno_dev->ringbuffer);
 	kgsl_device_platform_remove(device);
@@ -1665,6 +1667,18 @@ static int adreno_start(struct kgsl_device *device)
 		ft_detect_regs[10] = A3XX_RBBM_PERFCTR_SP_5_LO;
 		ft_detect_regs[11] = A3XX_RBBM_PERFCTR_SP_5_HI;
 	}
+
+	/*
+	 * Allocate some memory for A305 to do an extra draw on resume
+	 * from SLUMBER state.
+	 */
+	if (adreno_is_a305(adreno_dev) &&
+			adreno_dev->on_resume_cmd.hostptr == NULL) {
+		status = kgsl_allocate_contiguous(&adreno_dev->on_resume_cmd,
+					PAGE_SIZE);
+		if (status)
+			goto error_clk_off;
+        }
 
 	status = kgsl_mmu_start(device);
 	if (status)
@@ -3009,6 +3023,9 @@ static int adreno_ringbuffer_drain(struct kgsl_device *device,
 	unsigned long wait;
 	unsigned long timeout = jiffies + msecs_to_jiffies(ADRENO_IDLE_TIMEOUT);
 
+	if (!(rb->flags & KGSL_FLAGS_STARTED))
+		return 0;
+
 	/*
 	 * The first time into the loop, wait for 100 msecs and kick wptr again
 	 * to ensure that the hardware has updated correctly.  After that, kick
@@ -3041,6 +3058,8 @@ static int adreno_ringbuffer_drain(struct kgsl_device *device,
 /* Caller must hold the device mutex. */
 int adreno_idle(struct kgsl_device *device)
 {
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	unsigned int rbbm_status;
 	unsigned long wait_time;
 	unsigned long wait_time_part;
 	unsigned int prev_reg_val[FT_DETECT_REGS_COUNT];
@@ -3120,6 +3139,7 @@ static unsigned int adreno_isidle(struct kgsl_device *device)
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	struct adreno_ringbuffer *rb = &adreno_dev->ringbuffer;
 
+	WARN_ON(device->state == KGSL_STATE_INIT);
 	/* If the device isn't active, don't force it on. */
 	if (kgsl_pwrctrl_isenabled(device)) {
 		/* Is the ring buffer is empty? */
@@ -3154,6 +3174,8 @@ static int adreno_suspend_context(struct kgsl_device *device)
 		adreno_drawctxt_switch(adreno_dev, NULL, 0);
 		status = adreno_idle(device);
 	}
+	if (adreno_is_a305(adreno_dev))
+		adreno_dev->on_resume_issueib = true;
 
 	return status;
 }
@@ -3179,6 +3201,8 @@ struct kgsl_memdesc *adreno_find_ctxtmem(struct kgsl_device *device,
 
 		if (kgsl_mmu_pt_equal(&device->mmu, adreno_context->pagetable,
 					pt_base)) {
+			struct kgsl_memdesc *desc;
+
 			desc = &adreno_context->gpustate;
 			if (kgsl_gpuaddr_in_memdesc(desc, gpuaddr, size))
 				break;
@@ -3524,9 +3548,36 @@ unsigned int adreno_ft_detect(struct kgsl_device *device,
 			curr_context->pid_name, curr_context->ib_gpu_time_used,
 			curr_global_ts+1);
 
+			for (i = 0; i < ft_detect_regs_count; i++) {
+				if (curr_reg_val[i] != prev_reg_val[i]) {
+					fast_hang_detected = 0;
+
+					/* Check for long IB here */
+					if ((i >=
+						LONG_IB_DETECT_REG_INDEX_START)
+						&&
+						(i <=
+						LONG_IB_DETECT_REG_INDEX_END))
+						long_ib_detected = 0;
+				}
+			}
+
+			if (fast_hang_detected) {
+				KGSL_FT_ERR(device,
+					"Proc %s, ctxt_id %d ts %d triggered fault tolerance"
+					" on global ts %d\n",
+					curr_context->pid_name, curr_context->id
+					, (kgsl_readtimestamp(device, context,
+					KGSL_TIMESTAMP_RETIRED)+1),
+					curr_global_ts+1);
+				return 1;
+			}
+
 			if ((long_ib_detected) &&
 				(!(curr_context->flags &
 				 CTXT_FLAGS_NO_FAULT_TOLERANCE))) {
+				curr_context->ib_gpu_time_used +=
+					KGSL_TIMEOUT_PART;
 				if (curr_context->ib_gpu_time_used >
 					KGSL_TIMEOUT_LONG_IB_DETECTION) {
 					if (adreno_dev->long_ib_ts !=
@@ -3554,6 +3605,10 @@ unsigned int adreno_ft_detect(struct kgsl_device *device,
 					}
 				}
 			}
+		} else {
+			KGSL_FT_ERR(device,
+				"Last context unknown id:%d\n",
+				curr_context_id);
 		}
 	} else {
 		/* GPU is moving forward */
@@ -3571,6 +3626,48 @@ unsigned int adreno_ft_detect(struct kgsl_device *device,
 	for (i = 0; i < FT_DETECT_REGS_COUNT; i++)
 			prev_reg_val[i] = curr_reg_val[i];
 	return 0;
+}
+
+/**
+ * adreno_handle_hang - Process a hang detected in adreno_waittimestamp
+ * @device - pointer to a KGSL device structure
+ * @context - pointer to the active KGSL context
+ * @timestamp - the timestamp that the process was waiting for
+ *
+ * Process a possible GPU hang and try fault tolerance from it
+ * cleanly
+ */
+static int adreno_handle_hang(struct kgsl_device *device,
+	struct kgsl_context *context, unsigned int timestamp)
+{
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	unsigned int context_id = _get_context_id(context);
+	unsigned int ts_issued;
+	unsigned int rptr;
+
+	/* Do one last check to see if we somehow made it through */
+	if (kgsl_check_timestamp(device, context, timestamp))
+		return 0;
+
+	ts_issued = adreno_dev->ringbuffer.timestamp[context_id];
+
+	adreno_regread(device, REG_CP_RB_RPTR, &rptr);
+	mb();
+
+	KGSL_DRV_WARN(device,
+		     "Device hang detected while waiting for timestamp: "
+		     "<%d:0x%x>, last submitted timestamp: <%d:0x%x>, "
+		     "retired timestamp: <%d:0x%x>, wptr: 0x%x, rptr: 0x%x\n",
+		      context_id, timestamp, context_id, ts_issued, context_id,
+			kgsl_readtimestamp(device, context,
+			KGSL_TIMESTAMP_RETIRED),
+		      adreno_dev->ringbuffer.wptr, rptr);
+
+	/* Return 0 after a successful fault tolerance */
+	if (!adreno_dump_and_exec_ft(device))
+		return 0;
+
+	return -ETIMEDOUT;
 }
 
 static int _check_pending_timestamp(struct kgsl_device *device,
@@ -3621,10 +3718,13 @@ static int adreno_waittimestamp(struct kgsl_device *device,
 	struct adreno_context *adreno_ctx = context ? context->devctxt : NULL;
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 	unsigned int context_id = _get_context_id(context);
+	unsigned int prev_reg_val[ft_detect_regs_count];
 	unsigned int time_elapsed = 0;
 	unsigned int wait;
 	int ts_compare = 1;
 	int io, ret = -ETIMEDOUT;
+
+	/* Get out early if the context has already been destroyed */
 
 	if (context_id == KGSL_CONTEXT_INVALID) {
 		KGSL_DRV_WARN(device, "context was detached");
@@ -3645,6 +3745,10 @@ static int adreno_waittimestamp(struct kgsl_device *device,
 		/* Reset the invalid timestamp flag on a valid wait */
 		context->wait_on_invalid_ts = false;
 	}
+
+
+	/* Clear the registers used for hang detection */
+	memset(prev_reg_val, 0, sizeof(prev_reg_val));
 
 	/*
 	 * On the first time through the loop only wait 100ms.
@@ -3669,6 +3773,12 @@ static int adreno_waittimestamp(struct kgsl_device *device,
 		if (kgsl_check_timestamp(device, context, timestamp)) {
 			queue_work(device->work_queue, &device->ts_expired_ws);
 			ret = 0;
+			break;
+		}
+
+		/* Check to see if the GPU is hung */
+		if (adreno_ft_detect(device, prev_reg_val)) {
+			ret = adreno_handle_hang(device, context, timestamp);
 			break;
 		}
 
@@ -3765,6 +3875,7 @@ static unsigned int adreno_readtimestamp(struct kgsl_device *device,
 	switch (type) {
 	case KGSL_TIMESTAMP_QUEUED: {
 		struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+		struct adreno_ringbuffer *rb = &adreno_dev->ringbuffer;
 
 		timestamp = adreno_context_timestamp(context,
 				&adreno_dev->ringbuffer);
@@ -3791,6 +3902,8 @@ static long adreno_ioctl(struct kgsl_device_private *dev_priv,
 	struct kgsl_device *device = dev_priv->device;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	int result = 0;
+	struct kgsl_drawctxt_set_bin_base_offset *binbase;
+	struct kgsl_context *context;
 
 	switch (cmd) {
 	case IOCTL_KGSL_DRAWCTXT_SET_BIN_BASE_OFFSET: {

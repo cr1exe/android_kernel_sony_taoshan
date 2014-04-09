@@ -19,10 +19,12 @@
  * These defines control the address range for allocations that
  * are mapped into all pagetables.
  */
-#define KGSL_IOMMU_GLOBAL_MEM_BASE	0xf8000000
+#define KGSL_IOMMU_GLOBAL_MEM_BASE	0xC0000000
 #define KGSL_IOMMU_GLOBAL_MEM_SIZE	SZ_4M
+#define KGSL_IOMMU_TTBR1_SPLIT		2
 
-#define KGSL_MMU_ALIGN_MASK     (~((1 << PAGE_SHIFT) - 1))
+#define KGSL_MMU_ALIGN_SHIFT    13
+#define KGSL_MMU_ALIGN_MASK     (~((1 << KGSL_MMU_ALIGN_SHIFT) - 1))
 
 /* Identifier for the global page table */
 /* Per process page tables will probably pass in the thread group
@@ -227,6 +229,7 @@ void *kgsl_mmu_ptpool_init(int entries);
 int kgsl_mmu_enabled(void);
 void kgsl_mmu_set_mmutype(char *mmutype);
 enum kgsl_mmutype kgsl_mmu_get_mmutype(void);
+unsigned int kgsl_mmu_get_ptsize(void);
 int kgsl_mmu_gpuaddr_in_range(unsigned int gpuaddr);
 
 /*

@@ -319,7 +319,8 @@ int mdp4_overlay_iommu_map_buf(int mem_id,
 	struct ion_handle **srcp_ihdl)
 {
 	struct mdp4_iommu_pipe_info *iom;
-	unsigned long size = 0, map_size = 0;
+	unsigned long size = 0;
+	int map_size = 0;
 	int ret;
 
 	if (!display_iclient)
@@ -342,11 +343,11 @@ int mdp4_overlay_iommu_map_buf(int mem_id,
 		if(map_size < size)
 			map_size = size;
 
-	if (ion_map_iommu(display_iclient, *srcp_ihdl,
-				DISPLAY_READ_DOMAIN, GEN_POOL, SZ_4K, map_size, start,
-				len, 0, 0)) {
-			ion_free(display_iclient, *srcp_ihdl);
-			pr_err("%s(): ion_map_iommu() failed\n",
+		if (ion_map_iommu(display_iclient, *srcp_ihdl,
+		DISPLAY_READ_DOMAIN, GEN_POOL, SZ_4K, map_size, start,
+		len, 0, 0)) {
+		ion_free(display_iclient, *srcp_ihdl);
+		pr_err("%s(): ion_map_iommu() failed\n",
 					__func__);
 			return -EINVAL;
 		}
@@ -355,11 +356,11 @@ int mdp4_overlay_iommu_map_buf(int mem_id,
 		if (ion_map_iommu(display_iclient, *srcp_ihdl,
 				DISPLAY_READ_DOMAIN, GEN_POOL, SZ_4K, 0, start,
 				len, 0, 0)) {
-			ion_free(display_iclient, *srcp_ihdl);
-			pr_err("%s(): ion_map_iommu() failed\n",
-					__func__);
-			return -EINVAL;
-		}
+		ion_free(display_iclient, *srcp_ihdl);
+		pr_err("%s(): ion_map_iommu() failed\n",
+			__func__);
+		return -EINVAL;
+	}
 	}
 	mutex_lock(&iommu_mutex);
 	iom = &pipe->iommu;
@@ -1049,6 +1050,9 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 
 	if (pipe->frame_format != MDP4_FRAME_FORMAT_LINEAR)
 		outpdw(vg_base + 0x0048, frame_size);	/* TILE frame size */
+		real_pipe->prev_src_height = pipe->src_height;
+		real_pipe->prev_src_width = pipe->src_width;
+	}
 
 	/*
 	 * Adjust src X offset to avoid MDP from overfetching pixels
@@ -1916,7 +1920,7 @@ void mdp4_mixer_stage_down(struct mdp4_overlay_pipe *pipe, int commit)
 			ctrl->stage[mixer][i] = NULL;  /* clear it */
 	}
 
-	if (commit)
+	if (commit || (mixer > 0 && !hdmi_prim_display))
 		mdp4_mixer_stage_commit(mixer);
 }
 /*

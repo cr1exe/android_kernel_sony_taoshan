@@ -249,6 +249,10 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 
 	trace_kgsl_register_event(id, ts);
 
+	/* inc refcount to avoid race conditions in cleanup */
+	if (context)
+		kgsl_context_get(context);
+
 	/* Add the event to either the owning context or the global list */
 
 	if (context) {
@@ -266,10 +270,66 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 	} else
 		_add_event_to_list(&device->events, event);
 
+	/*
+	 * Increase the active count on the device to avoid going into power
+	 * saving modes while events are pending
+	 */
+
+	device->active_cnt++;
+
 	queue_work(device->work_queue, &device->ts_expired_ws);
 	return 0;
 }
 EXPORT_SYMBOL(kgsl_add_event);
+
+/**
+ * kgsl_cancel_events_ctxt - Cancel all events for a context
+ * @device - KGSL device for the events to cancel
+ * @context - context whose events we want to cancel
+ *
+ */
+void kgsl_cancel_events_ctxt(struct kgsl_device *device,
+	struct kgsl_context *context)
+{
+	struct kgsl_event *event, *event_tmp;
+	unsigned int id, cur;
+
+	cur = kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_RETIRED);
+	id = context->id;
+
+	/*
+	 * Increment the refcount to avoid freeing the context while
+	 * cancelling its events
+	 */
+	kgsl_context_get(context);
+
+	/* Remove ourselves from the master pending list */
+	list_del_init(&context->events_list);
+
+	list_for_each_entry_safe(event, event_tmp, &context->events, list) {
+		/*
+		 * "cancel" the events by calling their callback.
+		 * Currently, events are used for lock and memory
+		 * management, so if the process is dying the right
+		 * thing to do is release or free.
+		 *
+		 * Send the current timestamp so the event knows how far the
+		 * system got before the event was canceled
+		 */
+		list_del(&event->list);
+
+		trace_kgsl_fire_event(id, cur, jiffies - event->created);
+
+		if (event->func)
+			event->func(device, event->priv, id, cur);
+
+		kgsl_context_put(context);
+		kfree(event);
+
+		kgsl_active_count_put(device);
+	}
+	kgsl_context_put(context);
+}
 
 /**
  * kgsl_cancel_events - Cancel all generic events for a process

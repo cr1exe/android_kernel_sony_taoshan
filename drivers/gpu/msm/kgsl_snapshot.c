@@ -419,6 +419,9 @@ int kgsl_snapshot_get_object(struct kgsl_device *device, unsigned int ptbase,
 		goto err_put;
 	}
 
+	/* Ref count the mem entry */
+	kgsl_mem_entry_get(entry);
+
 	obj->type = type;
 	obj->entry = entry;
 	obj->gpuaddr = gpuaddr;

@@ -54,6 +54,8 @@
 #define ADRENO_DEFAULT_PWRSCALE_POLICY  NULL
 #endif
 
+void adreno_debugfs_init(struct kgsl_device *device);
+
 #define ADRENO_ISTORE_START 0x5000 /* Istore offset */
 
 #define ADRENO_NUM_CTX_SWITCH_ALLOWED_BEFORE_DRAW	50
@@ -79,7 +81,7 @@ enum adreno_gpurev {
 struct adreno_gpudev;
 
 struct adreno_device {
-	struct kgsl_device dev;    /* Must be first field in this struct */
+	struct kgsl_device dev;   /* This line must be first field in this struct or bad things happen */
 	unsigned int chip_id;
 	enum adreno_gpurev gpurev;
 	unsigned long gmem_base;
@@ -266,6 +268,7 @@ extern const unsigned int a330_registers[];
 extern const unsigned int a330_registers_count;
 
 extern unsigned int ft_detect_regs[];
+extern const unsigned int ft_detect_regs_count;
 
 
 int adreno_idle(struct kgsl_device *device);

@@ -164,6 +164,9 @@ static u32 ddl_supported_metadata_flag(struct ddl_client_context *ddl)
 		ddl->codec_data.decoder.codec.codec;
 
 	if (ddl->decoding) {
+		enum vcd_codec codec =
+			ddl->codec_data.decoder.codec.codec;
+
 		flag |= (VCD_METADATA_CONCEALMB | VCD_METADATA_PASSTHROUGH |
 				VCD_METADATA_QPARRAY |
 				VCD_METADATA_SEPARATE_BUF);

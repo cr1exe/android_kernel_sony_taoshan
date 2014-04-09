@@ -173,6 +173,7 @@ struct kgsl_device {
 	struct kgsl_pwrctrl pwrctrl;
 	int open_count;
 
+	struct atomic_notifier_head ts_notifier_list;
 	struct mutex mutex;
 	uint32_t state;
 	uint32_t requested_state;
@@ -234,6 +235,7 @@ void kgsl_check_fences(struct work_struct *work);
 	.hwaccess_gate = COMPLETION_INITIALIZER((_dev).hwaccess_gate),\
 	.suspend_gate = COMPLETION_INITIALIZER((_dev).suspend_gate),\
 	.ft_gate = COMPLETION_INITIALIZER((_dev).ft_gate),\
+	.ts_notifier_list = ATOMIC_NOTIFIER_INIT((_dev).ts_notifier_list),\
 	.idle_check_ws = __WORK_INITIALIZER((_dev).idle_check_ws,\
 			kgsl_idle_check),\
 	.hang_check_ws = __WORK_INITIALIZER((_dev).hang_check_ws,\
@@ -425,10 +427,26 @@ static inline int kgsl_create_device_workqueue(struct kgsl_device *device)
 	return 0;
 }
 
+static inline struct kgsl_context *
+kgsl_find_context(struct kgsl_device_private *dev_priv, uint32_t id)
+{
+	struct kgsl_context *ctxt =
+		idr_find(&dev_priv->device->context_idr, id);
 
+	/* Make sure that the context belongs to the current instance so
+	   that other processes can't guess context IDs and mess things up */
+
+	return  (ctxt && ctxt->dev_priv == dev_priv) ? ctxt : NULL;
+}
 
 int kgsl_check_timestamp(struct kgsl_device *device,
 		struct kgsl_context *context, unsigned int timestamp);
+
+int kgsl_register_ts_notifier(struct kgsl_device *device,
+			      struct notifier_block *nb);
+
+int kgsl_unregister_ts_notifier(struct kgsl_device *device,
+				struct notifier_block *nb);
 
 int kgsl_device_platform_probe(struct kgsl_device *device);
 
@@ -455,6 +473,10 @@ void kgsl_context_destroy(struct kref *kref);
  * kgsl_context_put - Release context reference count
  * @context
  *
+ * Asynchronous code that holds a pointer to a context
+ * must hold a reference count on it. The kgsl device
+ * mutex must be held while the context reference count
+ * is changed.
  */
 static inline void
 kgsl_context_put(struct kgsl_context *context)

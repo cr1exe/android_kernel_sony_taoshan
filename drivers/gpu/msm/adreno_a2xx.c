@@ -1601,6 +1601,12 @@ static void a2xx_drawctxt_restore(struct adreno_device *adreno_dev,
 					cmds, 5);
 	kgsl_mmu_setstate(&device->mmu, context->pagetable, context->id);
 
+#ifndef CONFIG_MSM_KGSL_CFF_DUMP_NO_CONTEXT_MEM_DUMP
+	kgsl_cffdump_syncmem(NULL, &context->gpustate,
+		context->gpustate.gpuaddr, LCC_SHADOW_SIZE +
+		REG_SHADOW_SIZE + CMD_BUFFER_SIZE + TEX_SHADOW_SIZE, false);
+#endif
+
 	/* restore gmem.
 	 *  (note: changes shader. shader must not already be restored.)
 	 */
@@ -1755,6 +1761,9 @@ static void a2xx_cp_intrcallback(struct kgsl_device *device)
 		KGSL_CMD_WARN(rb->device, "ringbuffer ib1/rb interrupt\n");
 		queue_work(device->work_queue, &device->ts_expired_ws);
 		wake_up_interruptible_all(&device->wait_queue);
+		atomic_notifier_call_chain(&(device->ts_notifier_list),
+					   device->id,
+					   NULL);
 	}
 }
 

@@ -123,6 +123,10 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 	if (len != sizeof(priv))
 		return -EINVAL;
 
+	context = kgsl_find_context(owner, context_id);
+	if (context == NULL)
+		return -EINVAL;
+
 	event = kzalloc(sizeof(*event), GFP_KERNEL);
 	if (event == NULL)
 		return -ENOMEM;
@@ -136,6 +140,7 @@ int kgsl_add_fence_event(struct kgsl_device *device,
 
 	event->context = context;
 	event->timestamp = timestamp;
+	kgsl_context_get(context);
 
 	pt = kgsl_sync_pt_create(context->timeline, timestamp);
 	if (pt == NULL) {

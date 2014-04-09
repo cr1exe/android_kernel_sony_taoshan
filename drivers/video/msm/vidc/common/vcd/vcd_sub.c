@@ -1865,12 +1865,12 @@ u32 vcd_handle_recvd_eos(
 		VCD_MSG_LOW("%s: decoding & virtual addr is NULL", __func__);
 	} else if (!cctxt->decoding && !cctxt->status.frame_delayed) {
 		if (!cctxt->status.frame_submitted) {
-			vcd_send_frame_done_in_eos(cctxt, input_frame, false);
-			if (cctxt->status.mask & VCD_EOS_WAIT_OP_BUF)
-				vcd_do_client_state_transition(cctxt,
-					VCD_CLIENT_STATE_EOS,
-					CLIENT_STATE_EVENT_NUMBER
-					(encode_frame));
+		vcd_send_frame_done_in_eos(cctxt, input_frame, false);
+		if (cctxt->status.mask & VCD_EOS_WAIT_OP_BUF)
+			vcd_do_client_state_transition(cctxt,
+				VCD_CLIENT_STATE_EOS,
+				CLIENT_STATE_EVENT_NUMBER
+				(encode_frame));
 		} else {
 			transc = vcd_get_first_in_use_trans_for_clnt(cctxt);
 			if (transc) {

@@ -179,10 +179,15 @@ struct kgsl_memdesc {
 #define KGSL_MEM_ENTRY_ION    4
 #define KGSL_MEM_ENTRY_MAX    5
 
+/* List of flags */
+
+#define KGSL_MEM_ENTRY_FROZEN (1 << 0)
+
 struct kgsl_mem_entry {
 	struct kref refcount;
 	struct kgsl_memdesc memdesc;
 	int memtype;
+	int flags;
 	void *priv_data;
 	struct rb_node node;
 	unsigned int id;
@@ -223,6 +228,9 @@ void kgsl_signal_events(struct kgsl_device *device,
 
 void kgsl_cancel_events(struct kgsl_device *device,
 	void *owner);
+
+void kgsl_cancel_events_ctxt(struct kgsl_device *device,
+	struct kgsl_context *context);
 
 extern const struct dev_pm_ops kgsl_pm_ops;
 

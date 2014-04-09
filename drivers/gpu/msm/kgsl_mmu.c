@@ -27,6 +27,9 @@
 #include "kgsl_sharedmem.h"
 #include "adreno.h"
 
+#define KGSL_MMU_ALIGN_SHIFT    13
+#define KGSL_MMU_ALIGN_MASK     (~((1 << KGSL_MMU_ALIGN_SHIFT) - 1))
+
 static enum kgsl_mmutype kgsl_mmu_type;
 
 static void pagetable_remove_sysfs_objects(struct kgsl_pagetable *pagetable);
@@ -56,6 +59,12 @@ static int kgsl_setup_pt(struct kgsl_pagetable *pt)
 	int status = 0;
 	struct kgsl_device *device;
 
+	/* For IOMMU only map the global structures to global pt */
+	if ((KGSL_MMU_TYPE_NONE != kgsl_mmu_type) &&
+		(KGSL_MMU_TYPE_IOMMU == kgsl_mmu_type) &&
+		(KGSL_MMU_GLOBAL_PT !=  pt->name) &&
+		(KGSL_MMU_PRIV_BANK_TABLE_NAME !=  pt->name))
+		return 0;
 	for (i = 0; i < KGSL_DEVICE_MAX; i++) {
 		device = kgsl_driver.devp[i];
 		if (device) {
@@ -310,6 +319,22 @@ err:
 	}
 
 	return ret;
+}
+
+unsigned int kgsl_mmu_get_ptsize(void)
+{
+	/*
+	 * For IOMMU, we could do up to 4G virtual range if we wanted to, but
+	 * it makes more sense to return a smaller range and leave the rest of
+	 * the virtual range for future improvements
+	 */
+
+	if (KGSL_MMU_TYPE_GPU == kgsl_mmu_type)
+		return CONFIG_MSM_KGSL_PAGE_TABLE_SIZE;
+	else if (KGSL_MMU_TYPE_IOMMU == kgsl_mmu_type)
+		return SZ_2G - KGSL_PAGETABLE_BASE;
+	else
+		return 0;
 }
 
 int
@@ -742,6 +767,8 @@ kgsl_mmu_map(struct kgsl_pagetable *pagetable,
 
 done:
 	spin_unlock(&pagetable->lock);
+	gen_pool_free(pool, memdesc->gpuaddr, size);
+	memdesc->gpuaddr = 0;
 	return ret;
 }
 EXPORT_SYMBOL(kgsl_mmu_map);
@@ -759,6 +786,8 @@ kgsl_mmu_put_gpuaddr(struct kgsl_pagetable *pagetable,
 {
 	struct gen_pool *pool;
 	int size;
+	unsigned int start_addr = 0;
+	unsigned int end_addr = 0;
 
 	if (memdesc->size == 0 || memdesc->gpuaddr == 0)
 		return 0;
@@ -806,6 +835,7 @@ kgsl_mmu_unmap(struct kgsl_pagetable *pagetable,
 
 	if (kgsl_mmu_type == KGSL_MMU_TYPE_NONE)
 		return 0;
+	}
 
 	/* Add space for the guard page when freeing the mmu VA. */
 	size = memdesc->size;

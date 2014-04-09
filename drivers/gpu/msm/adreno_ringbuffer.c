@@ -331,6 +331,9 @@ int adreno_ringbuffer_start(struct adreno_ringbuffer *rb)
 	if (rb->flags & KGSL_FLAGS_STARTED)
 		return 0;
 
+	if (init_ram)
+		rb->timestamp[KGSL_MEMSTORE_GLOBAL] = 0;
+
 	kgsl_sharedmem_set(&rb->memptrs_desc, 0, 0,
 			   sizeof(struct kgsl_rbmemptrs));
 
@@ -580,6 +583,9 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 	if (KGSL_MEMSTORE_GLOBAL != context_id)
 		total_sizedwords += 3; /* global timestamp without cache
 					* flush for non-zero context */
+	} else {
+		total_sizedwords += 4; /* global timestamp for fault tolerance*/
+	}
 
 	if (flags & KGSL_CMD_FLAGS_EOF)
 		total_sizedwords += 2;
@@ -636,6 +642,21 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, 1);
 	}
 
+	/* always increment the global timestamp. once. */
+	rb->timestamp[KGSL_MEMSTORE_GLOBAL]++;
+
+	/* Do not update context's timestamp for internal submissions */
+	if (context && !(flags & KGSL_CMD_FLAGS_INTERNAL_ISSUE)) {
+		if (context_id == KGSL_MEMSTORE_GLOBAL)
+			rb->timestamp[context->id] =
+				rb->timestamp[KGSL_MEMSTORE_GLOBAL];
+		else if (context->flags & CTXT_FLAGS_USER_GENERATED_TS)
+			rb->timestamp[context_id] = timestamp;
+		else
+			rb->timestamp[context_id]++;
+	}
+	timestamp = rb->timestamp[context_id];
+
 	/* HW Workaround for MMU Page fault
 	* due to memory getting free early before
 	* GPU completes it.
@@ -645,6 +666,10 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 			cp_type3_packet(CP_WAIT_FOR_IDLE, 1));
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, 0x00);
 	}
+
+	/* scratchpad ts for fault tolerance */
+	GSL_RB_WRITE(ringcmds, rcmd_gpu, cp_type0_packet(REG_CP_TIMESTAMP, 1));
+	GSL_RB_WRITE(ringcmds, rcmd_gpu, rb->timestamp[KGSL_MEMSTORE_GLOBAL]);
 
 	if (adreno_is_a3xx(adreno_dev)) {
 		/*
@@ -858,8 +883,10 @@ static bool _parse_ibs(struct kgsl_device_private *dev_priv,
 					 buffer */
 	struct kgsl_mem_entry *entry;
 
+	spin_lock(&dev_priv->process_priv->mem_lock);
 	entry = kgsl_sharedmem_find_region(dev_priv->process_priv,
 					   gpuaddr, sizedwords * sizeof(uint));
+	spin_unlock(&dev_priv->process_priv->mem_lock);
 	if (entry == NULL) {
 		KGSL_CMD_ERR(dev_priv->device,
 			     "no mapping for gpuaddr: 0x%08x\n", gpuaddr);

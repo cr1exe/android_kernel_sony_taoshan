@@ -230,6 +230,10 @@ static irqreturn_t z180_irq_handler(struct kgsl_device *device)
 
 			queue_work(device->work_queue, &device->ts_expired_ws);
 			wake_up_interruptible(&device->wait_queue);
+
+			atomic_notifier_call_chain(
+				&(device->ts_notifier_list),
+				device->id, NULL);
 		}
 	}
 
@@ -341,6 +345,11 @@ static void z180_cmdstream_start(struct kgsl_device *device)
 {
 	struct z180_device *z180_dev = Z180_DEVICE(device);
 	unsigned int cmd = VGV3_NEXTCMD_JUMP << VGV3_NEXTCMD_NEXTCMD_FSHIFT;
+
+	if (init_ram) {
+		z180_dev->timestamp = 0;
+		z180_dev->current_timestamp = 0;
+	}
 
 	addmarker(&z180_dev->ringbuffer, 0);
 

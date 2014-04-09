@@ -864,6 +864,8 @@ static int kgsl_iommu_init_sync_lock(struct kgsl_mmu *mmu)
 {
 	struct kgsl_iommu *iommu = mmu->priv;
 	int status = 0;
+	struct kgsl_pagetable *pagetable = NULL;
+	uint32_t lock_gpu_addr = 0;
 	uint32_t lock_phy_addr = 0;
 	uint32_t page_offset = 0;
 
@@ -912,6 +914,34 @@ static int kgsl_iommu_init_sync_lock(struct kgsl_mmu *mmu)
 	if (status)
 		return status;
 
+	/* Map Lock variables to GPU pagetable */
+	iommu->sync_lock_desc.priv |= KGSL_MEMDESC_GLOBAL;
+
+	pagetable = mmu->priv_bank_table ? mmu->priv_bank_table :
+				mmu->defaultpagetable;
+
+	status = kgsl_mmu_map(pagetable, &iommu->sync_lock_desc,
+				     GSL_PT_PAGE_RV | GSL_PT_PAGE_WV);
+
+	if (status) {
+		kgsl_mmu_unmap(pagetable, &iommu->sync_lock_desc);
+		iommu->sync_lock_desc.priv &= ~KGSL_MEMDESC_GLOBAL;
+		return status;
+	}
+
+	/* Store Lock variables GPU address  */
+	lock_gpu_addr = (iommu->sync_lock_desc.gpuaddr + page_offset);
+
+	kgsl_iommu_sync_lock_vars.flag[PROC_APPS] = (lock_gpu_addr +
+		(offsetof(struct remote_iommu_petersons_spinlock,
+			flag[PROC_APPS])));
+	kgsl_iommu_sync_lock_vars.flag[PROC_GPU] = (lock_gpu_addr +
+		(offsetof(struct remote_iommu_petersons_spinlock,
+			flag[PROC_GPU])));
+	kgsl_iommu_sync_lock_vars.turn = (lock_gpu_addr +
+		(offsetof(struct remote_iommu_petersons_spinlock, turn)));
+
+	iommu->sync_lock_vars = &kgsl_iommu_sync_lock_vars;
 
 	/* Flag Sync Lock is Initialized  */
 	iommu->sync_lock_initialized = 1;
@@ -1327,6 +1357,9 @@ done:
 static int kgsl_iommu_setup_defaultpagetable(struct kgsl_mmu *mmu)
 {
 	int status = 0;
+	int i = 0;
+	struct kgsl_iommu *iommu = mmu->priv;
+	struct kgsl_pagetable *pagetable = NULL;
 
 	/* If chip is not 8960 then we use the 2nd context bank for pagetable
 	 * switching on the 3D side for which a separate table is allocated */
@@ -1347,8 +1380,30 @@ static int kgsl_iommu_setup_defaultpagetable(struct kgsl_mmu *mmu)
 		status = -ENOMEM;
 		goto err;
 	}
+	pagetable = mmu->priv_bank_table ? mmu->priv_bank_table :
+				mmu->defaultpagetable;
+	/* Map the IOMMU regsiters to only defaultpagetable */
+	if (msm_soc_version_supports_iommu_v1()) {
+		for (i = 0; i < iommu->unit_count; i++) {
+			iommu->iommu_units[i].reg_map.priv |=
+						KGSL_MEMDESC_GLOBAL;
+			status = kgsl_mmu_map(pagetable,
+				&(iommu->iommu_units[i].reg_map),
+				GSL_PT_PAGE_RV | GSL_PT_PAGE_WV);
+			if (status) {
+				iommu->iommu_units[i].reg_map.priv &=
+							~KGSL_MEMDESC_GLOBAL;
+				goto err;
+			}
+		}
+	}
 	return status;
 err:
+	for (i--; i >= 0; i--) {
+		kgsl_mmu_unmap(pagetable,
+				&(iommu->iommu_units[i].reg_map));
+		iommu->iommu_units[i].reg_map.priv &= ~KGSL_MEMDESC_GLOBAL;
+	}
 	if (mmu->priv_bank_table) {
 		kgsl_iommu_cleanup_regs(mmu, mmu->priv_bank_table);
 		kgsl_mmu_putpagetable(mmu->priv_bank_table);
@@ -1480,6 +1535,11 @@ static int kgsl_iommu_start(struct kgsl_mmu *mmu)
 		status = kgsl_iommu_setup_defaultpagetable(mmu);
 		if (status)
 			return -ENOMEM;
+
+		/* Initialize the sync lock between GPU and CPU */
+		if (msm_soc_version_supports_iommu_v1() &&
+			(device->id == KGSL_DEVICE_3D0))
+				kgsl_iommu_init_sync_lock(mmu);
 	}
 
 	status = kgsl_iommu_start_sync_lock(mmu);
@@ -1577,12 +1637,14 @@ kgsl_iommu_unmap(void *mmu_specific_pt,
 			"with err: %d\n", iommu_pt->domain, gpuaddr,
 			range, ret);
 
+#ifdef CONFIG_KGSL_PER_PROCESS_PAGE_TABLE
 	/*
 	 * Flushing only required if per process pagetables are used. With
 	 * global case, flushing will happen inside iommu_map function
 	 */
 	if (!ret && kgsl_mmu_is_perprocess())
 		*tlb_flags = UINT_MAX;
+#endif
 	return 0;
 }
 
@@ -1673,6 +1735,17 @@ static int kgsl_iommu_close(struct kgsl_mmu *mmu)
 {
 	struct kgsl_iommu *iommu = mmu->priv;
 	int i;
+	for (i = 0; i < iommu->unit_count; i++) {
+		struct kgsl_pagetable *pagetable = (mmu->priv_bank_table ?
+			mmu->priv_bank_table : mmu->defaultpagetable);
+		if (iommu->iommu_units[i].reg_map.gpuaddr)
+			kgsl_mmu_unmap(pagetable,
+			&(iommu->iommu_units[i].reg_map));
+		if (iommu->iommu_units[i].reg_map.hostptr)
+			iounmap(iommu->iommu_units[i].reg_map.hostptr);
+		kgsl_sg_free(iommu->iommu_units[i].reg_map.sg,
+				iommu->iommu_units[i].reg_map.sglen);
+	}
 
 	if (mmu->priv_bank_table != NULL) {
 		kgsl_iommu_cleanup_regs(mmu, mmu->priv_bank_table);

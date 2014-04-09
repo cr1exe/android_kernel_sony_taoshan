@@ -584,6 +584,7 @@ static int ib_add_gpu_object(struct kgsl_device *device, unsigned int ptbase,
 			if (adreno_cmd_is_ib(src[i])) {
 				unsigned int gpuaddr = src[i + 1];
 				unsigned int size = src[i + 2];
+				unsigned int ibbase;
 
 				ret = parse_ib(device, ptbase, gpuaddr, size);
 
@@ -1032,6 +1033,17 @@ void *adreno_snapshot(struct kgsl_device *device, void *snapshot, int *remain,
 	 */
 	for (i = 0; i < objbufptr; i++)
 		snapshot = dump_object(device, i, snapshot, remain);
+
+	/*
+	 * Only dump the istore on a hang - reading it on a running system
+	 * has a non 0 chance of hanging the GPU
+	 */
+
+	if (hang) {
+		snapshot = kgsl_snapshot_add_section(device,
+			KGSL_SNAPSHOT_SECTION_ISTORE, snapshot, remain,
+			snapshot_istore, NULL);
+	}
 
 	/* Add GPU specific sections - registers mainly, but other stuff too */
 	if (adreno_dev->gpudev->snapshot)
